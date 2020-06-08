@@ -1,9 +1,10 @@
 # GLOBAL DEFINES
-T_G_WIDTH = 48
-T_G_HEIGHT = 48
+T_G_WIDTH = 224
+T_G_HEIGHT = 224
 T_G_NUMCHANNELS = 3
 T_G_SEED = 1337
-
+T_G_BATCHSIZE = 50
+T_G_VAL_RATIO = 0.02
 # Misc. Necessities
 import sys
 import ssl # these two lines solved issues loading pretrained model
@@ -13,20 +14,27 @@ np.random.seed(T_G_SEED)
 
 # TensorFlow Includes
 import tensorflow as tf
-tf.set_random_seed(T_G_SEED)
+tf.random.set_seed(T_G_SEED)
 
-# Keras Imports & Defines
-import keras
-from keras.preprocessing.image import load_img, img_to_array
-import keras.applications
-from keras import backend as K
-from keras.models import Model
-from keras.optimizers import SGD
-import keras.layers as kl
+# tensorflow.keras Imports & Defines
+from tensorflow.keras.preprocessing.image import load_img, img_to_array
+from tensorflow.keras import backend as K
+from tensorflow.keras.models import Model
+from tensorflow.keras.optimizers import SGD
+import tensorflow.keras.layers as kl
 
 from tensorflow.keras.applications.resnet50 import ResNet50
 from tensorflow.keras.applications.resnet50 import preprocess_input as preprocessResNet50
 from tensorflow.keras.applications.resnet50 import decode_predictions as decodeResNet50
+
+from tensorflow.keras.applications.mobilenet_v2 import MobileNetV2
+from tensorflow.keras.applications.mobilenet_v2 import preprocess_input as preprocessMobileNetV2
+
+
+from tensorflow.keras.applications.xception import preprocess_input as preprocessXception
+
+
+T_G_PREPROCESS = preprocessXception
 
 # Pandas for reading triplets
 import pandas as pd
@@ -128,7 +136,7 @@ def createModelResnet(emb_size):
 
   # Initialize a ResNet50_ImageNet Model
   resnet_input = kl.Input(shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
-  resnet_model = keras.applications.resnet50.ResNet50(weights='imagenet', include_top = False, input_tensor=resnet_input)
+  resnet_model = tensorflow.keras.applications.resnet50.ResNet50(weights='imagenet', include_top = False, input_tensor=resnet_input)
 
   # Freeze ResNet50
   for layer in resnet_model.layers:
@@ -150,7 +158,7 @@ def createModelResnet(emb_size):
 def createModelResnetFull():
 
   # Initialize a ResNet50_ImageNet Model
-  baseModel = keras.applications.resnet50.ResNet50(weights='imagenet')
+  baseModel = tensorflow.keras.applications.resnet50.ResNet50(weights='imagenet')
   baseModel.name = 'baseModel'
 
   # Freeze ResNet50
@@ -165,7 +173,7 @@ def createModelResnetFull():
 def createModelXception():
 
 
-  pretrained = keras.applications.xception.Xception(include_top=False,
+  pretrained = tensorflow.keras.applications.xception.Xception(include_top=False,
                                                     weights='imagenet',
                                                     input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
 
@@ -184,11 +192,11 @@ def createModelXception():
 
 
 # PRE:
-# POST: Returns a keras siamese model with triplet loss
+# POST: Returns a tensorflow.keras siamese model with triplet loss
 def createModelShort():
 
   # Initialize base model
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=32, kernel_size=(7,7), activation='relu', padding='same', name='conv1'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2,2), padding='same', name='mp1'))
   baseModel.add(kl.Conv2D(filters=64, kernel_size=(5,5), activation='relu', padding='same', name='conv2'))
@@ -205,11 +213,11 @@ def createModelShort():
 
 
 # PRE:
-# POST: Returns a keras siamese model with triplet loss
+# POST: Returns a tensorflow.keras siamese model with triplet loss
 def createModelSmall():
 
   # Initialize base model
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(7,7), activation='relu', padding='same', name='conv1'))
   baseModel.add(kl.MaxPooling2D(pool_size=(4,4), padding='same', name='mp1'))
   baseModel.add(kl.Conv2D(filters=2, kernel_size=(3,3), activation='relu', padding='same', name='conv2'))
@@ -221,11 +229,11 @@ def createModelSmall():
 
 
 # PRE:
-# POST: Returns a keras siamese model with triplet loss
+# POST: Returns a tensorflow.keras siamese model with triplet loss
 def createModelSmallRegularized():
 
   # Initialize base model
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(7,7), padding='same', name='conv1'))
   baseModel.add(kl.BatchNormalization())
   baseModel.add(kl.Activation('relu'))
@@ -242,11 +250,11 @@ def createModelSmallRegularized():
 
 
 # PRE:
-# POST: Returns a keras siamese model with triplet loss
+# POST: Returns a tensorflow.keras siamese model with triplet loss
 def createModelNormalized():
 
   # Initialize base model
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(5,5), padding='same', name='conv1'))
   baseModel.add(kl.BatchNormalization())
   baseModel.add(kl.Activation('relu'))
@@ -269,7 +277,7 @@ def createModelNormalized():
 # POST:
 def createModelLecture():
 
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(16, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
   baseModel.add(kl.Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform'))
@@ -289,7 +297,7 @@ def createModelLecture():
 # POST:
 def createModelMini():
 
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(32, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
   baseModel.add(kl.Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
@@ -331,7 +339,7 @@ def createModelKaggle():
 # PRE:
 # POST:
 def createModelTrueLecture():
-  baseModel = keras.Sequential(name='baseModel')
+  baseModel = tensorflow.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(32, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
@@ -345,7 +353,7 @@ def createModelTrueLecture():
 # PRE:
 # POST:
 def createPostprocess(emb_size):
-  combineModel = keras.Sequential(name='combineModel')
+  combineModel = tensorflow.keras.Sequential(name='combineModel')
   combineModel.add(kl.Dense(emb_size, activation='relu'))
   combineModel.add(kl.Dropout(0.5))
   combineModel.add(kl.Dense(1, activation='softmax'))
@@ -356,7 +364,7 @@ def createPostprocess(emb_size):
 ############# Generator definition #############
 
 
-class TipletGenerator(keras.utils.Sequence) :
+class TipletGenerator(tensorflow.keras.utils.Sequence) :
 
   def __init__(self, tiplets, batchSize, preprocess=lambda x: x) :
     self.triplets = tiplets
@@ -392,7 +400,7 @@ class TipletGenerator(keras.utils.Sequence) :
     return [getChannelInput(idx) for idx in range(3)], np.zeros(len(batch))
 
 
-class SimilarityGenerator(keras.utils.Sequence) :
+class SimilarityGenerator(tensorflow.keras.utils.Sequence) :
 
   def __init__(self, triplets, batchSize, preprocess=lambda x: x, shuffle=False) :
     self.pairs = [[triplet[0], triplet[i]] for triplet, i in product(triplets, [1, 2])]
@@ -447,7 +455,7 @@ def getTriplets(filename, subfixes=['']):
 
 
 def loadModel(filename):
-  model = keras.models.load_model(filename, custom_objects={'triplet_loss': triplet_loss, \
+  model = tensorflow.keras.models.load_model(filename, custom_objects={'triplet_loss': triplet_loss, \
                                                             'distanceSquared': distanceSquared, \
                                                             'accuracy': accuracy, \
                                                             'posDist': posDist, 'negDist': negDist})
