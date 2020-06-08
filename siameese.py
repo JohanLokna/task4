@@ -136,7 +136,7 @@ def createModelResnet(emb_size):
 
   # Initialize a ResNet50_ImageNet Model
   resnet_input = kl.Input(shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
-  resnet_model = tensorflow.keras.applications.resnet50.ResNet50(weights='imagenet', include_top = False, input_tensor=resnet_input)
+  resnet_model = tf.keras.applications.resnet50.ResNet50(weights='imagenet', include_top = False, input_tensor=resnet_input)
 
   # Freeze ResNet50
   for layer in resnet_model.layers:
@@ -151,6 +151,49 @@ def createModelResnet(emb_size):
   base_model = Model(resnet_model.input, net, name='baseModel')
 
   return base_model
+  
+def createMobileNetV2Top():
+  baseModel = tf.keras.applications.MobileNetV2(weights='imagenet', include_top=False, input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
+  # print(baseModel._name)
+  # baseModel._name = 'baseModel'
+  
+  # Freeze MobileNetV2
+  for layer in baseModel.layers:
+    layer.trainable = False
+  top = baseModel.output
+  top = kl.GlobalAveragePooling2D()(top)
+  top = kl.Flatten()(top)
+  top = kl.Dense(256, activation='relu')(top)
+  top = kl.Dense(128, activation='softmax')(top)
+  return Model(inputs=baseModel.inputs, outputs=top, name='baseModel')
+
+# PRE:
+# POST: Returns a resnet base model
+def createModelXception():
+
+
+  pretrained = tf.keras.applications.xception.Xception(include_top=False,
+                                                    weights='imagenet', pooling='avg',
+                                                    input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
+  pretrained._name = 'baseModel'
+  # Add top to make base model
+  top = pretrained.output
+  # top = kl.MaxPooling2D(pool_size=(2,2), padding='same')(top)
+  # top = kl.Flatten(name='flatten')(top)
+  # top = kl.Dense(128, activation='tanh')(top)
+  
+  top = kl.Flatten()(top)
+  top = kl.Dense(1024, activation='relu')(top)
+
+  baseModel = Model(inputs=pretrained.inputs, outputs=top, name='baseModel')
+
+  # freeze the body layers
+  for layer in pretrained.layers:
+      layer.trainable = False
+
+  return baseModel
+
+
 
 
 # PRE:
@@ -158,7 +201,7 @@ def createModelResnet(emb_size):
 def createModelResnetFull():
 
   # Initialize a ResNet50_ImageNet Model
-  baseModel = tensorflow.keras.applications.resnet50.ResNet50(weights='imagenet')
+  baseModel = tf.keras.applications.resnet50.ResNet50(weights='imagenet')
   baseModel.name = 'baseModel'
 
   # Freeze ResNet50
@@ -169,34 +212,11 @@ def createModelResnetFull():
 
 
 # PRE:
-# POST: Returns a resnet base model
-def createModelXception():
-
-
-  pretrained = tensorflow.keras.applications.xception.Xception(include_top=False,
-                                                    weights='imagenet',
-                                                    input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
-
-  # Add top to make base model
-  top = pretrained.output
-  top = kl.MaxPooling2D(pool_size=(2,2), padding='same')(top)
-  top = kl.Flatten(name='flatten')(top)
-  top = kl.Dense(128, activation='tanh')(top)
-  baseModel = Model(inputs=pretrained.inputs, outputs=top, name='baseModel')
-
-  # freeze the body layers
-  for layer in pretrained.layers:
-      layer.trainable = False
-
-  return baseModel
-
-
-# PRE:
 # POST: Returns a tensorflow.keras siamese model with triplet loss
 def createModelShort():
 
   # Initialize base model
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=32, kernel_size=(7,7), activation='relu', padding='same', name='conv1'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2,2), padding='same', name='mp1'))
   baseModel.add(kl.Conv2D(filters=64, kernel_size=(5,5), activation='relu', padding='same', name='conv2'))
@@ -217,7 +237,7 @@ def createModelShort():
 def createModelSmall():
 
   # Initialize base model
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(7,7), activation='relu', padding='same', name='conv1'))
   baseModel.add(kl.MaxPooling2D(pool_size=(4,4), padding='same', name='mp1'))
   baseModel.add(kl.Conv2D(filters=2, kernel_size=(3,3), activation='relu', padding='same', name='conv2'))
@@ -233,7 +253,7 @@ def createModelSmall():
 def createModelSmallRegularized():
 
   # Initialize base model
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(7,7), padding='same', name='conv1'))
   baseModel.add(kl.BatchNormalization())
   baseModel.add(kl.Activation('relu'))
@@ -254,7 +274,7 @@ def createModelSmallRegularized():
 def createModelNormalized():
 
   # Initialize base model
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(filters=16, kernel_size=(5,5), padding='same', name='conv1'))
   baseModel.add(kl.BatchNormalization())
   baseModel.add(kl.Activation('relu'))
@@ -277,7 +297,7 @@ def createModelNormalized():
 # POST:
 def createModelLecture():
 
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(16, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
   baseModel.add(kl.Conv2D(32, (3, 3), activation='relu', kernel_initializer='he_uniform'))
@@ -297,7 +317,7 @@ def createModelLecture():
 # POST:
 def createModelMini():
 
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(32, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
   baseModel.add(kl.Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
@@ -339,7 +359,7 @@ def createModelKaggle():
 # PRE:
 # POST:
 def createModelTrueLecture():
-  baseModel = tensorflow.keras.Sequential(name='baseModel')
+  baseModel = tf.keras.Sequential(name='baseModel')
   baseModel.add(kl.Conv2D(32, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.Conv2D(64, kernel_size=(3, 3), activation='relu', kernel_initializer='he_uniform'))
   baseModel.add(kl.MaxPooling2D(pool_size=(2, 2)))
@@ -353,7 +373,7 @@ def createModelTrueLecture():
 # PRE:
 # POST:
 def createPostprocess(emb_size):
-  combineModel = tensorflow.keras.Sequential(name='combineModel')
+  combineModel = tf.keras.Sequential(name='combineModel')
   combineModel.add(kl.Dense(emb_size, activation='relu'))
   combineModel.add(kl.Dropout(0.5))
   combineModel.add(kl.Dense(1, activation='softmax'))
@@ -364,7 +384,7 @@ def createPostprocess(emb_size):
 ############# Generator definition #############
 
 
-class TipletGenerator(tensorflow.keras.utils.Sequence) :
+class TipletGenerator(tf.keras.utils.Sequence) :
 
   def __init__(self, tiplets, batchSize, preprocess=lambda x: x) :
     self.triplets = tiplets
@@ -400,7 +420,7 @@ class TipletGenerator(tensorflow.keras.utils.Sequence) :
     return [getChannelInput(idx) for idx in range(3)], np.zeros(len(batch))
 
 
-class SimilarityGenerator(tensorflow.keras.utils.Sequence) :
+class SimilarityGenerator(tf.keras.utils.Sequence) :
 
   def __init__(self, triplets, batchSize, preprocess=lambda x: x, shuffle=False) :
     self.pairs = [[triplet[0], triplet[i]] for triplet, i in product(triplets, [1, 2])]
@@ -455,7 +475,7 @@ def getTriplets(filename, subfixes=['']):
 
 
 def loadModel(filename):
-  model = tensorflow.keras.models.load_model(filename, custom_objects={'triplet_loss': triplet_loss, \
+  model = tf.keras.models.load_model(filename, custom_objects={'triplet_loss': triplet_loss, \
                                                             'distanceSquared': distanceSquared, \
                                                             'accuracy': accuracy, \
                                                             'posDist': posDist, 'negDist': negDist})
@@ -470,15 +490,25 @@ def printModel(model):
 ############# Training #############
 
 
-def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preprocess=lambda x: x):
+def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preprocess=lambda x: x, transfer=False):
 
-  printModel(model)
-
-  trainGen = SimilarityGenerator(tripletsTrain, batchSize, preprocess, shuffle=True)
-  valGen = SimilarityGenerator(tripletsVal, batchSize, preprocess)
-
+  trainGen = TipletGenerator(tripletsTrain, batchSize, preprocess)
+  valGen = TipletGenerator(tripletsVal, batchSize, preprocess)
+  if transfer:
+    print('transfer')
+    baseModel = model.get_layer('baseModel')
+    # transfer learning: after training the classifier layers on top of the convs,
+    # fine-tune the conv layers
+    for layer in baseModel.layers[:-2]:
+      layer.trainable = True
+    for layer in baseModel.layers[-2:]:
+      layer.trainable = False
+    model.compile(optimizer=tf.keras.optimizers.Adam(0.0001), loss=triplet_loss, metrics=[accuracy, posDist, negDist])
+    printModel(model)
+  
+  print("training for ", len(tripletsTrain), "triplets")
   for i in range(nEpochs):
-    model.fit_generator(generator=trainGen,
+    model.fit(trainGen,
                         steps_per_epoch = len(trainGen),
                         epochs = 1,
                         verbose = 1,
@@ -487,16 +517,24 @@ def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preproc
     model.save(outdir + '/model' +  str(len(os.listdir(outdir))))
 
 
-def main(model, outdir, preprocess=lambda x: x, tripletFile='train_triplets.txt', subfixes=['']):
+def main(model, outdir, preprocess=lambda x: x, transfer=False):
+  printModel(model)
 
   if not os.path.exists(outdir):
     os.makedirs(outdir)
+  triplets = getTriplets('train_triplets.txt')
+  train_triplets, val_triplets = train_val_split(triplets, T_G_VAL_RATIO)
+  batchSize = T_G_BATCHSIZE
+  nEpochs = 3
+  train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess)
+  # train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess, True)
+    
 
-  triplets = getTriplets(tripletFile)
-  trainLength = int(len(triplets) * 0.98)
-  batchSize = 400
-  nEpochs = 10
-  train(model, triplets[:trainLength], triplets[trainLength:], nEpochs, batchSize, outdir, preprocess)
+def train_val_split(triplets, size):
+  val_triplets = triplets[:int(len(triplets) * size)]
+  mask = np.any(np.isin(triplets, val_triplets), axis=1) != True
+  train_triplets = np.array(triplets)[mask]
+  return train_triplets, val_triplets
 
 
 ############# Post training #############
@@ -517,11 +555,11 @@ def pred(model, filename, distFilename):
         print('Completed: {}/{}'.format(i + 1, len(testGen)))
 
 
-def validate(model):
+def validate(model, preprocess):
   triplets = getTriplets('train_triplets.txt')
-  trainLength = int(len(triplets) * 0.90)
-  batchSize = 100
-  valGen = TipletGenerator(triplets[trainLength:], batchSize)
+  train_triplets, val_triplets = train_val_split(triplets, T_G_VAL_RATIO)
+  batchSize = T_G_BATCHSIZE
+  valGen = TipletGenerator(val_triplets, batchSize, preprocess)
 
   def getValAccuracy():
         res = 0.0
@@ -541,8 +579,10 @@ def validate(model):
 ############# Calling #############
 
 if __name__ == '__main__':
-  model = makeTriplet(createModelTrueLecture())
-  # model = loadModel('resnet1000_1_top500/model0')
-  main(model, outdir='similarityKaggle', tripletFile='train_triplets.txt', subfixes=[''])
-  # pred(model, 'resultsResnet1000_1_top500.txt', 'distResnet1000_1_top500.txt')
-  # validate(model)
+  T_G_PREPROCESS = preprocessXception
+  model = makeTriplet(baseModel=createModelXception(), combineModel=None, name='mobilenetv2')
+  # model = loadModel('mobilenetv2/model5')
+  main(model, 'xception', T_G_PREPROCESS, transfer=True)
+  # printModel(model)
+  # pred(model, T_G_PREPROCESS, 'resultsmobilenetv2_3epochs.txt')
+  # validate(model, T_G_PREPROCESS)
