@@ -132,25 +132,26 @@ def createSimilarityModel(feature_model):
 
 # PRE:
 # POST: Returns a resnet base model
-def createModelResnet(emb_size):
+def createModelResnet():
 
   # Initialize a ResNet50_ImageNet Model
-  resnet_input = kl.Input(shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
-  resnet_model = tf.keras.applications.resnet50.ResNet50(weights='imagenet', include_top = False, input_tensor=resnet_input)
+  pretrained = tf.keras.applications.resnet50.ResNet50(include_top=False,
+                                                       weights='imagenet', pooling='avg',
+                                                       input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
 
-  # Freeze ResNet50
-  for layer in resnet_model.layers:
-    layer.trainable = False
+  # freeze the body layers
+  for layer in pretrained.layers:
+      layer.trainable = False
+  
+  # Add top to make base model
+  top = pretrained.output
+  top = kl.Flatten()(top)
+  top = kl.Dropout(0.25)(top)
+  top = kl.Dense(1024, activation='relu')(top)
 
-  # New Layers over ResNet50
-  net = resnet_model.output
-  net = kl.GlobalAveragePooling2D(name='gap')(net)
-  net = kl.Dense(emb_size, activation='relu', name='embeded')(net)
+  baseModel = Model(inputs=pretrained.inputs, outputs=top, name='baseModel')
 
-  # Base model
-  base_model = Model(resnet_model.input, net, name='baseModel')
-
-  return base_model
+  return baseModel
   
 def createMobileNetV2Top():
   baseModel = tf.keras.applications.MobileNetV2(weights='imagenet', include_top=False, input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
@@ -170,7 +171,6 @@ def createMobileNetV2Top():
 # PRE:
 # POST: Returns a resnet base model
 def createModelXception():
-
 
   pretrained = tf.keras.applications.xception.Xception(include_top=False,
                                                     weights='imagenet', pooling='avg',
@@ -485,6 +485,13 @@ def loadModel(filename):
 def printModel(model):
   print(model.summary())
   print(model.get_layer('baseModel').summary())
+    
+
+def train_val_split(triplets, size):
+  val_triplets = triplets[:int(len(triplets) * size)]
+  mask = np.any(np.isin(triplets, val_triplets), axis=1) != True
+  train_triplets = np.array(triplets)[mask]
+  return train_triplets, val_triplets
 
 
 ############# Training #############
@@ -517,24 +524,17 @@ def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preproc
     model.save(outdir + '/model' +  str(len(os.listdir(outdir))))
 
 
-def main(model, outdir, preprocess=lambda x: x, transfer=False):
+def main(model, nEpochs, outdir, preprocess=lambda x: x, sufixes=[''], transfer=False):
+  
   printModel(model)
 
   if not os.path.exists(outdir):
     os.makedirs(outdir)
-  triplets = getTriplets('train_triplets.txt')
+ 
+  triplets = getTriplets('train_triplets.txt', sufixes)
   train_triplets, val_triplets = train_val_split(triplets, T_G_VAL_RATIO)
-  batchSize = T_G_BATCHSIZE
-  nEpochs = 3
-  train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess)
-  # train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess, True)
-    
 
-def train_val_split(triplets, size):
-  val_triplets = triplets[:int(len(triplets) * size)]
-  mask = np.any(np.isin(triplets, val_triplets), axis=1) != True
-  train_triplets = np.array(triplets)[mask]
-  return train_triplets, val_triplets
+  train(model, train_triplets, val_triplets, nEpochs, T_G_BATCHSIZE, outdir, preprocess, transfer)
 
 
 ############# Post training #############
@@ -579,7 +579,6 @@ def validate(model, preprocess):
 ############# Calling #############
 
 if __name__ == '__main__':
-  T_G_PREPROCESS = preprocessXception
   model = makeTriplet(baseModel=createModelXception(), combineModel=None, name='mobilenetv2')
   # model = loadModel('mobilenetv2/model5')
   main(model, 'xception', T_G_PREPROCESS, transfer=True)
