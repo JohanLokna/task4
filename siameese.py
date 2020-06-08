@@ -5,6 +5,7 @@ T_G_NUMCHANNELS = 3
 T_G_SEED = 1337
 T_G_BATCHSIZE = 50
 T_G_VAL_RATIO = 0.02
+T_G_EPOCHS = 5
 # Misc. Necessities
 import sys
 import ssl # these two lines solved issues loading pretrained model
@@ -60,7 +61,7 @@ def distanceSquared(x):
 # PRE:
 # POST: Costum accuracy
 def accuracy(y_true, y_pred):
-    tf.print(y_pred)
+    # tf.print(y_pred)
     return K.mean(y_pred[:,0] < y_pred[:,1])
 
 # PRE:
@@ -153,7 +154,7 @@ def createModelResnet(emb_size):
   return base_model
   
 def createMobileNetV2Top():
-  baseModel = tf.keras.applications.MobileNetV2(weights='imagenet', include_top=False, input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
+  baseModel = tf.keras.applications.MobileNetV2(weights='imagenet', include_top=False, pooling='avg', input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
   # print(baseModel._name)
   # baseModel._name = 'baseModel'
   
@@ -161,10 +162,8 @@ def createMobileNetV2Top():
   for layer in baseModel.layers:
     layer.trainable = False
   top = baseModel.output
-  top = kl.GlobalAveragePooling2D()(top)
   top = kl.Flatten()(top)
-  top = kl.Dense(256, activation='relu')(top)
-  top = kl.Dense(128, activation='softmax')(top)
+  top = kl.Dense(1024, activation='relu')(top)
   return Model(inputs=baseModel.inputs, outputs=top, name='baseModel')
 
 # PRE:
@@ -504,17 +503,18 @@ def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preproc
     for layer in baseModel.layers[-2:]:
       layer.trainable = False
     model.compile(optimizer=tf.keras.optimizers.Adam(0.0001), loss=triplet_loss, metrics=[accuracy, posDist, negDist])
+    nEpochs = 1
     printModel(model)
   
   print("training for ", len(tripletsTrain), "triplets")
-  for i in range(nEpochs):
-    model.fit(trainGen,
-                        steps_per_epoch = len(trainGen),
-                        epochs = 1,
-                        verbose = 1,
-                        validation_data = valGen,
-                        validation_steps = len(valGen))
-    model.save(outdir + '/model' +  str(len(os.listdir(outdir))))
+# for i in range(nEpochs):
+  model.fit(trainGen,
+                      steps_per_epoch = len(trainGen),
+                      epochs = nEpochs,
+                      verbose = 1,
+                      validation_data = valGen,
+                      validation_steps = len(valGen))
+  model.save(outdir + '/model' +  str(len(os.listdir(outdir))))
 
 
 def main(model, outdir, preprocess=lambda x: x, transfer=False):
@@ -525,7 +525,7 @@ def main(model, outdir, preprocess=lambda x: x, transfer=False):
   triplets = getTriplets('train_triplets.txt')
   train_triplets, val_triplets = train_val_split(triplets, T_G_VAL_RATIO)
   batchSize = T_G_BATCHSIZE
-  nEpochs = 3
+  nEpochs = T_G_EPOCHS
   train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess)
   # train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess, True)
     
@@ -540,10 +540,10 @@ def train_val_split(triplets, size):
 ############# Post training #############
 
 
-def pred(model, filename, distFilename):
+def pred(model, filename, distFilename, preprocess):
 
   triplets = getTriplets('test_triplets.txt')
-  testGen = TipletGenerator(triplets, 100)
+  testGen = TipletGenerator(triplets, T_G_BATCHSIZE, preprocess)
   with open(filename, 'w+') as f:
     with open(distFilename, 'w+') as distF:
       for i in range(len(testGen)):
@@ -579,10 +579,10 @@ def validate(model, preprocess):
 ############# Calling #############
 
 if __name__ == '__main__':
-  T_G_PREPROCESS = preprocessXception
-  model = makeTriplet(baseModel=createModelXception(), combineModel=None, name='mobilenetv2')
+  T_G_PREPROCESS = preprocessMobileNetV2
+  model = makeTriplet(baseModel=createMobileNetV2Top(), combineModel=None, name='mobilenetv2')
   # model = loadModel('mobilenetv2/model5')
-  main(model, 'xception', T_G_PREPROCESS, transfer=True)
+  main(model, 'mobilenetv2_new', T_G_PREPROCESS, transfer=True)
   # printModel(model)
-  # pred(model, T_G_PREPROCESS, 'resultsmobilenetv2_3epochs.txt')
+  # pred(model, 'resultsmobilenetv2_3epochs.txt', 'xception_dist.txt', T_G_PREPROCESS)
   # validate(model, T_G_PREPROCESS)
