@@ -210,18 +210,18 @@ def createModelResnetFull():
   return baseModel
 
 def createModelInceptionV3():
-  pretrained_model = tensorflow.keras.applications.inception_v3.InceptionV3(include_top=False, input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
+  pretrained_model = tf.keras.applications.inception_v3.InceptionV3(include_top=False, input_shape=(T_G_WIDTH,T_G_HEIGHT,T_G_NUMCHANNELS))
   for layer in pretrained_model.layers:
     layer.trainable = False
   last_layer = pretrained_model.get_layer('mixed7')
   last_output = last_layer.output
   # Flatten the output layer to 1 dimension
-  x = layers.Flatten()(last_output)
+  x = kl.Flatten()(last_output)
   # Add a fully connected layer with 1,024 hidden units and ReLU activation
-  x = layers.Dense(1024, activation='relu')(x)
+  x = kl.Dense(1024, activation='relu')(x)
   # Add a dropout rate of 0.2
-  x = layers.Dropout(0.2)(x)
-  model = Model(pre_trained_model.input, x)
+  x = kl.Dropout(0.2)(x)
+  model = Model(pretrained_model.input, x)
   return model
 
 # PRE:
@@ -351,20 +351,20 @@ def train(model, tripletsTrain, tripletsVal, nEpochs, batchSize, outdir, preproc
   if transfer:
     print('transfer')
     baseModel = model.get_layer('baseModel')
-    unfreeze = False
-    # Unfreeze all models after "mixed6"
-    for layer in baseModel.layers:
-      if unfreeze:
-        layer.trainable = True
-      if layer.name == 'mixed6':
-        unfreeze = True
+    # unfreeze = False
+    # # Unfreeze all models after "mixed6"
+    # for layer in baseModel.layers:
+    #   if unfreeze:
+    #     layer.trainable = True
+    #   if layer.name == 'mixed6':
+    #     unfreeze = True
     # transfer learning: after training the classifier layers on top of the convs,
     # fine-tune the conv layers
-    # for layer in baseModel.layers[:-2]:
-    #   layer.trainable = True
-    # for layer in baseModel.layers[-2:]:
-    #   layer.trainable = False
-    model.compile(optimizer=tf.keras.optimizers.SGD(lr=0.00001, momentum=0.9), loss=triplet_loss, metrics=[accuracy, posDist, negDist])
+    for layer in baseModel.layers[:-2]:
+      layer.trainable = True
+    for layer in baseModel.layers[-2:]:
+      layer.trainable = False
+    model.compile(optimizer=tf.keras.optimizers.Adam(0.0001), loss=triplet_loss, metrics=[accuracy, posDist, negDist])
     nEpochs = 1
     printModel(model)
   
