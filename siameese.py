@@ -5,7 +5,7 @@ T_G_NUMCHANNELS = 3
 T_G_SEED = 1337
 T_G_BATCHSIZE = 50
 T_G_VAL_RATIO = 0.02
-T_G_EPOCHS = 5
+T_G_EPOCHS = 3
 # Misc. Necessities
 import sys
 import ssl # these two lines solved issues loading pretrained model
@@ -73,7 +73,6 @@ def posDist(y_true, y_pred):
 # POST: Costum accuracy
 def negDist(y_true, y_pred):
     return y_pred[:,1]
-
 
 # PRE:
 # POST: 
@@ -526,8 +525,7 @@ def main(model, outdir, preprocess=lambda x: x, transfer=False):
   train_triplets, val_triplets = train_val_split(triplets, T_G_VAL_RATIO)
   batchSize = T_G_BATCHSIZE
   nEpochs = T_G_EPOCHS
-  train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess)
-  # train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess, True)
+  train(model, train_triplets, val_triplets, nEpochs, batchSize, outdir, preprocess, transfer)
     
 
 def train_val_split(triplets, size):
@@ -579,10 +577,11 @@ def validate(model, preprocess):
 ############# Calling #############
 
 if __name__ == '__main__':
-  T_G_PREPROCESS = preprocessMobileNetV2
-  model = makeTriplet(baseModel=createMobileNetV2Top(), combineModel=None, name='mobilenetv2')
+  T_G_PREPROCESS = preprocessXception
+  model = makeTriplet(baseModel=createModelXception(), combineModel=None, name='xception_full')
   # model = loadModel('mobilenetv2/model5')
-  main(model, 'mobilenetv2_new', T_G_PREPROCESS, transfer=True)
+  main(model, 'xception_full', T_G_PREPROCESS, transfer=False)
+  main(model, 'xception_full', T_G_PREPROCESS, transfer=True)
   # printModel(model)
-  # pred(model, 'resultsmobilenetv2_3epochs.txt', 'xception_dist.txt', T_G_PREPROCESS)
+  pred(model, 'results_xception_full.txt', 'xception_dist.txt', T_G_PREPROCESS)
   # validate(model, T_G_PREPROCESS)
